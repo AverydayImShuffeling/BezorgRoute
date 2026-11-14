@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bezorgroute</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f6f5f2;--card:#fff;--tx:#1d1d1b;--mut:#6b6b66;--ac:#d6322b;--ac2:#1f7a4d;--bd:#e3e1db}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151514;--card:#222220;--tx:#f1f0ec;--mut:#9b9a94;--ac:#ef5a52;--ac2:#3fb67b;--bd:#34332f;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#151514;--card:#222220;--tx:#f1f0ec;--mut:#9b9a94;--ac:#ef5a52;--ac2:#3fb67b;--bd:#34332f;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;max-width:560px;margin:0 auto;padding:14px 14px 40px}
+h1{font-size:20px;margin:4px 0 12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;margin-bottom:12px}
+.row{display:flex;gap:8px;align-items:center}
+.seg{display:flex;background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:3px;margin-bottom:12px}
+.seg button{flex:1;border:0;background:none;color:var(--tx);padding:12px;border-radius:9px;font-size:16px;font-weight:600}
+.seg button.on{background:var(--ac);color:#fff}
+input,select{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:11px;min-width:0}
+input{flex:1}
+button.b{border:0;background:var(--ac);color:#fff;font:inherit;font-weight:600;border-radius:10px;padding:11px 14px}
+button.g{background:var(--ac2)}button.l{background:var(--bg);color:var(--tx);border:1px solid var(--bd)}
+button.big{width:100%;padding:15px;font-size:17px;margin-top:8px}
+.stop{display:flex;gap:8px;align-items:center;padding:9px 0;border-top:1px solid var(--bd)}
+.stop:first-child{border-top:0}
+.stop .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stop small{display:block;color:var(--mut);font-size:12px}
+.num{width:26px;height:26px;border-radius:50%;background:var(--ac);color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none}
+.mut{color:var(--mut);font-size:13px}
+a.nav{display:block;text-align:center;text-decoration:none;background:var(--ac2);color:#fff;font-weight:700;border-radius:10px;padding:14px;margin-top:8px}
+#scan{position:fixed;inset:0;background:#000;z-index:9;display:none;flex-direction:column}
+#scan video{flex:1;width:100%;object-fit:cover;min-height:0}
+#scan .bar{padding:14px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));background:#111;color:#fff;text-align:center}
+#sug .b{text-align:left}
+.stop select{font-size:14px;max-width:150px}
+#frame{position:absolute;left:50%;top:40%;width:62vmin;height:62vmin;transform:translate(-50%,-50%);border:3px solid #fff;border-radius:16px;box-shadow:0 0 0 100vmax rgba(0,0,0,.2);pointer-events:none}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:20px;opacity:0;transition:opacity .2s;z-index:10;pointer-events:none;max-width:90%}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<h1>🍣 Bezorgroute</h1>
+
+<div class="seg" id="mode">
+  <button data-m="driving" class="on">🚗 Auto</button>
+  <button data-m="bicycling">🚲 Fiets</button>
+</div>
+
+<div class="card">
+  <div class="mut">Start en eind (vast): <b>Sushi Station Nieuw-Vennep</b>, Händelplein 29A</div>
+  
+</div>
+
+<div class="card">
+  <button class="b big" id="scanBtn" style="margin-top:0">📷 QR-codes scannen</button>
+  <button class="b l big" id="photoBtn">📱 Scannen met camera-app</button>
+  <div class="row" style="margin-top:10px">
+    <input id="link" placeholder="Typ adres (met huisnummer) of plak Maps-link" autocomplete="off">
+    <button class="b" id="add">+</button>
+  </div>
+  <div id="sug" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div><div class="mut" style="margin-top:6px">Typ een adres en kies een suggestie. Korte Maps-links (maps.app.goo.gl) bevatten soms geen coördinaten.</div>
+</div>
+
+<div class="card">
+  <div class="row" style="justify-content:space-between;margin-bottom:4px"><b>Stops (<span id="cnt">0</span>)</b><button class="b l" id="clear">Alles wissen</button></div>
+  <div id="list"><div class="mut">Nog geen stops.</div></div>
+  <div class="mut" style="margin-top:6px">Hoge prioriteit gaat eerst, dan lage, dan geen prioriteit.</div>
+  <button class="b g big" id="calc">Bereken beste route</button>
+</div>
+
+<div class="card" id="res" style="display:none"></div>
+
+<div id="scan">
+  <video id="vid" playsinline muted autoplay></video><div id="frame"></div>
+  <div class="bar"><div id="zoomRow" style="display:none;align-items:center;gap:10px;margin-bottom:10px"><span>🔍</span><input type="range" id="zoom" style="flex:1;padding:0;border:0;background:none"></div><div id="scanMsg" style="margin-bottom:10px">Richt op de QR-code</div><button class="b" id="scanClose">Klaar</button> <button class="b l" id="phBtn" style="display:none">📷 Foto maken</button><input type="file" id="ph" accept="image/*" capture="environment" style="display:none"></div>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+let S={stops:[],mode:'driving',start:{lat:52.2606,lng:4.6322,i:0,name:'Sushi Station Nieuw-Vennep'},route:null};
+try{const x=JSON.parse(localStorage.getItem('br1')||'null');if(x){S.stops=x.stops||[];S.mode=x.mode||S.mode}}catch(e){}
+const save=()=>{try{localStorage.setItem('br1',JSON.stringify({stops:S.stops,mode:S.mode,start:S.start}))}catch(e){}};
+const toast=t=>{const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),1800)};
+const rad=x=>x*Math.PI/180;
+let M=null,DM=null;
+function dist(a,b){if(M&&a.i!=null&&b.i!=null)return M[a.i][b.i];return hav(a,b)}
+function hav(a,b){const R=6371,dl=rad(b.lat-a.lat),dg=rad(b.lng-a.lng);const h=Math.sin(dl/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+const cost=p=>{let c=0;for(let i=1;i<p.length;i++)c+=dist(p[i-1],p[i]);return c};
+
+function parse(raw){
+  let t=raw.trim(),u=t;try{u=decodeURIComponent(t)}catch(e){}
+  let m=u.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/)||u.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)||u.match(/(-?\d{1,2}\.\d{3,})[,\s+]+(-?\d{1,3}\.\d{3,})/);
+  let label='';
+  const p=u.match(/\/place\/([^\/@?]+)/);if(p)label=p[1].replace(/\+/g,' ');
+  const q=u.match(/[?&](?:q|query|destination|daddr)=([^&]+)/);if(!label&&q&&!/^-?\d+\.\d+,/.test(q[1]))label=q[1].replace(/\+/g,' ');
+  if(!label&&!/^https?:/i.test(t))label=t;
+  return {lat:m?+m[1]:null,lng:m?+m[2]:null,label:label,url:/^https?:/i.test(t)?t:''};
+}
+function addStop(raw){
+  raw=raw.trim();if(!raw)return false;
+  if(S.stops.some(s=>s.raw===raw)){toast('Deze stop staat er al in');return false}
+  const r=parse(raw);
+  const st={id:Date.now()+Math.random(),raw,lat:r.lat,lng:r.lng,label:r.lat!=null?'Adres ophalen…':(r.label||'Onbekend adres'),url:r.url,prio:3};S.stops.push(st);if(r.lat!=null)nameFor(st,r.label);
+  S.route=null;save();render();
+  toast(r.lat==null?'Toegevoegd (zonder coördinaten)':'Toegevoegd ✓');return true;
+}
+
+function render(){
+  $('#cnt').textContent=S.stops.length;
+  
+  document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.m===S.mode));
+  const L=$('#list');
+  if(!S.stops.length){L.innerHTML='<div class="mut">Nog geen stops.</div>'}
+  else{
+    L.innerHTML='';
+    S.stops.forEach(s=>{
+      const d=document.createElement('div');d.className='stop';
+      const n=document.createElement('div');n.className='n';
+      n.textContent=s.label;
+      const sm=document.createElement('small');sm.textContent=s.lat==null?'⚠ geen coördinaten gevonden':s.lat.toFixed(4)+', '+s.lng.toFixed(4);
+      n.appendChild(sm);
+      const sel=document.createElement('select');
+      [[3,'Geen prioriteit'],[2,'Lage prioriteit'],[1,'Hoge prioriteit']].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;if(s.prio===v)o.selected=true;sel.appendChild(o)});
+      sel.onchange=()=>{s.prio=+sel.value;S.route=null;save();renderRes()};
+      const x=document.createElement('button');x.className='b l';x.textContent='✕';
+      x.onclick=()=>{S.stops=S.stops.filter(k=>k!==s);S.route=null;save();render()};
+      d.append(n,sel,x);L.appendChild(d);
+    });
+  }
+  renderRes();
+}
+
+function twoOpt(path,fixedEnd){
+  let best=cost(path),imp=true;
+  const last=fixedEnd?path.length-2:path.length-1;
+  while(imp){imp=false;
+    for(let i=1;i<last;i++)for(let j=i+1;j<=last;j++){
+      const c=path.slice(0,i).concat(path.slice(i,j+1).reverse(),path.slice(j+1));
+      const v=cost(c);if(v<best-1e-9){path=c;best=v;imp=true}
+    }}
+  return path;
+}
+async function calc(){
+  const ok=S.stops.filter(s=>s.lat!=null),bad=S.stops.filter(s=>s.lat==null);
+  if(!S.stops.length){toast('Voeg eerst stops toe');return}
+  S.start.i=0;ok.forEach((s,k)=>s.i=k+1);M=null;DM=null;S.road=false;
+  if(ok.length){
+    toast('Wegen berekenen…');
+    try{
+      const pp=[S.start,...ok];
+      const host=S.mode==='driving'?'https://router.project-osrm.org/table/v1/driving/':'https://routing.openstreetmap.de/routed-bike/table/v1/driving/';
+      const r=await fetch(host+pp.map(p=>p.lng+','+p.lat).join(';')+'?annotations=duration,distance');
+      const j=await r.json();
+      if(j.code==='Ok'&&j.durations&&!j.durations.flat().includes(null)){M=j.durations;DM=j.distances;S.road=true}
+    }catch(e){}
+    if(!S.road)toast('Wegennet niet bereikbaar: schatting op afstand');
+  }
+  const prios=[...new Set(ok.map(s=>s.prio))].sort((a,b)=>a-b);
+  let cur=S.start,order=[];
+  prios.forEach((p,gi)=>{
+    const lastG=gi===prios.length-1;
+    let rem=ok.filter(s=>s.prio===p),seq=[],c=cur;
+    while(rem.length){let bi=0;rem.forEach((s,i)=>{if(dist(c,s)<dist(c,rem[bi]))bi=i});c=rem[bi];seq.push(c);rem.splice(bi,1)}
+    let path=[cur,...seq];if(lastG)path.push(S.start);
+    path=twoOpt(path,lastG);
+    seq=path.slice(1,lastG?path.length-1:path.length);
+    order=order.concat(seq);cur=seq[seq.length-1]||cur;
+  });
+  S.route={order,bad};renderRes();
+  $('#res').scrollIntoView({behavior:'smooth'});
+}
+function renderRes(){
+  const R=$('#res');
+  if(!S.route){R.style.display='none';return}
+  const {order,bad}=S.route;
+  const pts=[S.start,...order,S.start];
+  let km=0,min=0;
+  if(S.road&&DM){let sec=0;for(let k=1;k<pts.length;k++){km+=DM[pts[k-1].i][pts[k].i]/1000;sec+=M[pts[k-1].i][pts[k].i]}min=Math.round(sec/60)}
+  else{for(let k=1;k<pts.length;k++)km+=hav(pts[k-1],pts[k])*1.3;min=Math.round(km/(S.mode==='driving'?35:16)*60)}
+  R.style.display='block';R.innerHTML='';
+  const h=document.createElement('div');h.innerHTML='<b>Beste volgorde</b>';
+  const info=document.createElement('div');info.className='mut';
+  info.textContent=(S.road?'Gebaseerd op wegen: ':'Schatting op afstand: ')+km.toFixed(1)+' km, ±'+min+' min onderweg (zonder stoptijd).';
+  R.append(h,info);
+  const mk=(t,i)=>{const d=document.createElement('div');d.className='stop';const nm=document.createElement('span');nm.className='num';nm.textContent=i;const n=document.createElement('div');n.className='n';n.textContent=t;d.append(nm,n);R.appendChild(d)};
+  mk('🍣 '+S.start.name+' (start)','S');
+  order.forEach((s,i)=>mk(s.label+(s.prio===1?'  · hoge prioriteit':s.prio===2?'  · lage prioriteit':''),i+1));
+  mk('🍣 '+S.start.name+' (eind)','E');
+  if(bad.length){const w=document.createElement('div');w.className='mut';w.style.marginTop='8px';w.textContent='⚠ Niet meegenomen (geen coördinaten): '+bad.map(b=>b.label).join(', ')+'. Open die los in Google Maps.';R.appendChild(w)}
+  const f=p=>p.lat+','+p.lng;
+  for(let i=0;i<pts.length-1;i+=10){
+    const seg=pts.slice(i,Math.min(i+11,pts.length));
+    if(seg.length<2)break;
+    const a=document.createElement('a');a.className='nav';a.target='_blank';a.rel='noopener';
+    let u='https://www.google.com/maps/dir/?api=1&origin='+f(seg[0])+'&destination='+f(seg[seg.length-1])+'&travelmode='+S.mode;
+    if(seg.length>2)u+='&waypoints='+seg.slice(1,-1).map(f).join('%7C');
+    a.href=u;
+    const parts=Math.ceil((pts.length-1)/10);
+    a.textContent='▶ Start navigatie'+(parts>1?' (deel '+(i/10+1)+' van '+parts+')':'');
+    R.appendChild(a);
+  }
+}
+
+// Scanner
+let stream=null,scanning=false,lastVal='';
+async function openScan(){
+  $('#scan').style.display='flex';$('#scanMsg').textContent='Camera starten…';
+  try{
+    try{const ps=await navigator.permissions.query({name:'camera'});if(ps.state==='denied'){$('#scanMsg').textContent='Cameratoegang is geblokkeerd. Zet de camera aan via Chrome → ⋮ → Instellingen → Site-instellingen → Camera.';$('#phBtn').style.display='inline-block';return}}catch(e){}
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});
+    const v=$('#vid');v.srcObject=stream;await v.play();setupTrack();$('#scanMsg').textContent='Zoekt naar QR-code… houd de code in het kader';
+    const det=('BarcodeDetector' in window)?new BarcodeDetector({formats:['qr_code']}):null;
+    const cv=document.createElement('canvas'),cx=cv.getContext('2d',{willReadFrequently:true});
+    scanning=true;lastVal='';
+    const tick=async()=>{
+      if(!scanning)return;
+      try{
+        let val=null;
+        if(det){const c=await det.detect(v);if(c[0])val=c[0].rawValue}
+        else if(v.videoWidth&&window.jsQR){const sc=Math.min(1,1000/v.videoWidth);cv.width=Math.round(v.videoWidth*sc);cv.height=Math.round(v.videoHeight*sc);cx.drawImage(v,0,0,cv.width,cv.height);const im=cx.getImageData(0,0,cv.width,cv.height);const r=jsQR(im.data,cv.width,cv.height);if(r)val=r.data}
+        if(val&&val!==lastVal){lastVal=val;addStop(val);navigator.vibrate&&navigator.vibrate(80);closeScan();return}
+      }catch(e){}
+      setTimeout(tick,150);
+    };
+    tick();
+  }catch(e){
+    $('#scanMsg').textContent='Camera niet beschikbaar. Geef cameratoegang, maak een foto van de code of plak de link.';$('#phBtn').style.display='inline-block';
+  }
+}
+function closeScan(){scanning=false;if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;$('#scan').style.display='none'}
+
+$('#scanBtn').onclick=()=>{if(window.isSecureContext&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)openScan();else{toast('Camera-app openen…');$('#ph').click()}};$('#scanClose').onclick=closeScan;
+$('#add').onclick=()=>{const v=$('#link').value.trim();if(!v)return;if(/^https?:/i.test(v)){if(addStop(v))$('#link').value=''}else suggest(v)};
+let tm;$('#link').addEventListener('input',e=>{clearTimeout(tm);const v=e.target.value.trim();if(v.length<3||/^https?:/i.test(v)){$('#sug').innerHTML='';return}tm=setTimeout(()=>suggest(v),300)});
+$('#link').addEventListener('keydown',e=>{if(e.key==='Enter')$('#add').click()});
+$('#calc').onclick=calc;
+$('#clear').onclick=()=>{if(S.stops.length&&confirm('Alle stops wissen?')){S.stops=[];S.route=null;save();render()}};
+$('#mode').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.mode=b.dataset.m;S.route=null;save();render()};
+const PD='https://api.pdok.nl/bzk/locatieserver/search/v3_1/';
+const FL='straatnaam,huisnummer,huisletter,huisnummertoevoeging,woonplaatsnaam';
+function fmt(d){return d&&d.straatnaam&&d.huisnummer?d.straatnaam+' '+d.huisnummer+(d.huisletter||'')+(d.huisnummertoevoeging?'-'+d.huisnummertoevoeging:'')+(d.woonplaatsnaam?', '+d.woonplaatsnaam:''):''}
+async function nameFor(st,fb){
+  try{const r=await fetch(PD+'reverse?type=adres&rows=1&lat='+st.lat+'&lon='+st.lng+'&fl='+FL);const d=(await r.json()).response.docs[0];st.label=fmt(d)||fb||'Onbekend adres'}
+  catch(e){st.label=fb||'Onbekend adres'}
+  save();render();
+}
+const ll=c=>{const m=c.match(/\(([-\d.]+) ([-\d.]+)\)/);return {lat:+m[2],lng:+m[1]}};
+async function suggest(v){
+  const box=$('#sug');
+  try{
+    const r=await fetch(PD+'suggest?rows=5&lat=52.26&lon=4.63&fq='+encodeURIComponent('type:adres')+'&q='+encodeURIComponent(v));
+    const docs=(await r.json()).response.docs;
+    box.innerHTML='';
+    if(!docs.length){box.innerHTML='<div class="mut">Geen adres gevonden. Typ ook het huisnummer.</div>';return}
+    docs.forEach(d=>{const b=document.createElement('button');b.className='b l';b.textContent=d.weergavenaam;b.onclick=()=>pick(d);box.appendChild(b)});
+  }catch(e){box.textContent='Zoeken lukt niet (geen internet?)'}
+}
+async function pick(d){
+  try{
+    const r=await fetch(PD+'lookup?fl=centroide_ll,weergavenaam,'+FL+'&id='+encodeURIComponent(d.id));
+    const doc=(await r.json()).response.docs[0],c=ll(doc.centroide_ll);
+    S.stops.push({id:Date.now()+Math.random(),raw:doc.weergavenaam,lat:c.lat,lng:c.lng,label:fmt(doc)||doc.weergavenaam,url:'',prio:3});
+    S.route=null;save();render();toast('Toegevoegd ✓');$('#link').value='';$('#sug').innerHTML='';
+  }catch(e){toast('Adres ophalen mislukt')}
+}
+(async()=>{try{const r=await fetch(PD+'free?rows=1&fl=centroide_ll&q='+encodeURIComponent('Händelplein 29A 2151 NM Nieuw-Vennep'));const c=ll((await r.json()).response.docs[0].centroide_ll);S.start.lat=c.lat;S.start.lng=c.lng}catch(e){}})();
+$('#phBtn').onclick=()=>$('#ph').click();
+$('#photoBtn').onclick=()=>$('#ph').click();
+async function setupTrack(){
+  const tr=stream.getVideoTracks()[0],zr=$('#zoomRow'),z=$('#zoom');zr.style.display='none';
+  let caps={};try{caps=tr.getCapabilities?tr.getCapabilities():{}}catch(e){}
+  try{if(caps.focusMode&&caps.focusMode.includes('continuous'))await tr.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
+  if(caps.zoom){z.min=caps.zoom.min;z.max=caps.zoom.max;z.step=caps.zoom.step||0.1;const init=Math.min(caps.zoom.max,Math.max(caps.zoom.min,2));z.value=init;try{await tr.applyConstraints({advanced:[{zoom:init}]})}catch(e){}zr.style.display='flex'}
+}
+$('#zoom').oninput=()=>{const tr=stream&&stream.getVideoTracks()[0];if(tr)tr.applyConstraints({advanced:[{zoom:+$('#zoom').value}]}).catch(()=>{})};
+$('#vid').onclick=async()=>{const tr=stream&&stream.getVideoTracks()[0];if(!tr)return;try{await tr.applyConstraints({advanced:[{focusMode:'single-shot'}]});setTimeout(()=>tr.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{}),1500)}catch(e){}};
+$('#ph').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  let val=null;
+  try{
+    const bmp=await createImageBitmap(f),cv=document.createElement('canvas');cv.width=bmp.width;cv.height=bmp.height;
+    const cx=cv.getContext('2d');cx.drawImage(bmp,0,0);
+    if('BarcodeDetector' in window){const c=await new BarcodeDetector({formats:['qr_code']}).detect(cv);if(c[0])val=c[0].rawValue}
+    for(const w of [1400,900,600]){if(val||!window.jsQR)break;const sc=Math.min(1,w/bmp.width),c2=document.createElement('canvas');c2.width=Math.round(bmp.width*sc);c2.height=Math.round(bmp.height*sc);const x2=c2.getContext('2d');x2.drawImage(bmp,0,0,c2.width,c2.height);const im=x2.getImageData(0,0,c2.width,c2.height);const r=jsQR(im.data,c2.width,c2.height);if(r)val=r.data}
+  }catch(x){}
+  if(val)addStop(val);else toast('Geen QR gevonden, probeer opnieuw');
+  e.target.value='';
+};
+render();
+</script>
+</body>
+</html>
